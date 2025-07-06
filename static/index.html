@@ -1,0 +1,459 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кодинг Платформа</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #0088cc;
+            --tg-theme-button-color: #0088cc;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f1f1f1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--tg-theme-link-color);
+        }
+
+        .auth-section,
+        .section {
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--tg-theme-link-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .user-details h3 {
+            margin-bottom: 5px;
+        }
+
+        .user-details p {
+            color: var(--tg-theme-hint-color);
+            font-size: 14px;
+        }
+
+        .section h2 {
+            margin-bottom: 15px;
+            color: var(--tg-theme-link-color);
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .task-item {
+            background: var(--tg-theme-bg-color);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid var(--tg-theme-hint-color);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .task-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .task-points {
+            background: var(--tg-theme-link-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .task-description {
+            color: var(--tg-theme-hint-color);
+            margin-bottom: 8px;
+        }
+
+        .task-difficulty {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .difficulty-easy {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .difficulty-medium {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .difficulty-hard {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .task-item.completed {
+            opacity: 0.6;
+            cursor: not-allowed;
+            border-style: dashed;
+        }
+
+        .code-section {
+            display: none;
+        }
+
+        .code-section.active {
+            display: block;
+        }
+
+        .code-editor {
+            width: 100%;
+            height: 300px;
+            border: 1px solid var(--tg-theme-hint-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+
+        .button {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        .button:hover {
+            opacity: 0.8;
+        }
+
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-secondary {
+            background: transparent;
+            color: var(--tg-theme-link-color);
+            border: 1px solid var(--tg-theme-link-color);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid var(--tg-theme-hint-color);
+            border-top: 3px solid var(--tg-theme-link-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .result {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .result.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+
+        .result.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">💻</div>
+            <h1 class="title">Кодинг Платформа</h1>
+        </div>
+
+        <div class="auth-section" id="authSection">
+            <div class="loading" id="authLoading">
+                <div class="spinner"></div>
+                <p>Авторизация...</p>
+            </div>
+            <div class="user-info hidden" id="userInfo">
+                <div class="avatar" id="userAvatar">U</div>
+                <div class="user-details">
+                    <h3 id="userName">Пользователь</h3>
+                    <p id="userStats">Баллы: 0 | Решено задач: 0</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="tasksSection">
+            <h2>📋 Доступные задания</h2>
+            <div class="loading" id="tasksLoading">
+                <div class="spinner"></div>
+                <p>Загрузка заданий...</p>
+            </div>
+            <div class="task-list" id="taskList"></div>
+        </div>
+
+        <div class="section code-section" id="codeSection">
+            <h2 id="currentTaskTitle">Задание</h2>
+            <p id="currentTaskDescription">Описание задания</p>
+            <h3>Ваш код:</h3>
+            <textarea class="code-editor" id="codeEditor" placeholder="Введите ваш код здесь..."></textarea>
+            <button class="button" id="submitButton" onclick="submitCode()">Отправить решение</button>
+            <button class="button button-secondary" id="backButton" onclick="showTasksView()">Назад к заданиям</button>
+            <div class="result hidden" id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let currentUser = null;
+        let currentTask = null;
+        let allTasks = [];
+
+        async function apiRequest(endpoint, method = 'GET', body = null) {
+            const headers = { 'Content-Type': 'application/json' };
+            const options = { method, headers };
+            if (body) {
+                options.body = JSON.stringify({ ...body, initData: tg.initData });
+            }
+
+            try {
+                const response = await fetch(endpoint, options);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Network response was not ok' }));
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API Request Error:', error);
+                tg.showAlert(`Ошибка при запросе к серверу: ${error.message}`);
+                throw error;
+            }
+        }
+
+        function updateUserInfo() {
+            if (!currentUser) return;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+
+            const userName = currentUser.username || 'User';
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+            document.getElementById('userStats').textContent = `Баллы: ${currentUser.points} | Решено задач: ${currentUser.completed_tasks.length}`;
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+
+            allTasks.forEach(task => {
+                const isCompleted = currentUser.completed_tasks.includes(task.id);
+                const taskItem = document.createElement('div');
+                taskItem.className = 'task-item' + (isCompleted ? ' completed' : '');
+                if (!isCompleted) {
+                    taskItem.onclick = () => openTask(task);
+                }
+
+                const difficultyClass = `difficulty-${task.difficulty.toLowerCase()}`;
+
+                taskItem.innerHTML = `
+                    <div class="task-header">
+                        <div class="task-title">${task.title} ${isCompleted ? '✓' : ''}</div>
+                        <div class="task-points">${task.points} баллов</div>
+                    </div>
+                    <div class="task-description">${task.description}</div>
+                    <div class="task-difficulty ${difficultyClass}">${task.difficulty}</div>
+                `;
+                taskList.appendChild(taskItem);
+            });
+            document.getElementById('tasksLoading').classList.add('hidden');
+        }
+
+        function showTasksView() {
+            document.getElementById('tasksSection').classList.remove('hidden');
+            document.getElementById('codeSection').classList.remove('active');
+            renderTasks();
+        }
+
+        function openTask(task) {
+            currentTask = task;
+            document.getElementById('tasksSection').classList.add('hidden');
+            document.getElementById('codeSection').classList.add('active');
+
+            document.getElementById('currentTaskTitle').textContent = task.title;
+            document.getElementById('currentTaskDescription').textContent = task.description;
+            document.getElementById('codeEditor').value = '';
+            document.getElementById('result').classList.add('hidden');
+        }
+
+        async function submitCode() {
+            const code = document.getElementById('codeEditor').value.trim();
+            if (!code) {
+                showResult('Пожалуйста, введите код решения', 'error');
+                return;
+            }
+
+            const submitButton = document.getElementById('submitButton');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Проверка...';
+
+            try {
+                const data = await apiRequest('/api/submit', 'POST', { taskId: currentTask.id, code: code });
+
+                if (data.ok) {
+                    showResult(data.message, data.passed ? 'success' : 'error');
+                    if (data.passed) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                        // Обновляем данные пользователя
+                        currentUser.points = data.new_points;
+                        currentUser.completed_tasks = [...currentUser.completed_tasks, currentTask.id];
+                        updateUserInfo();
+                        // Через 2 секунды возвращаемся к списку задач
+                        setTimeout(showTasksView, 2000);
+                    } else {
+                        tg.HapticFeedback.notificationOccurred('error');
+                    }
+                }
+            } catch (error) {
+                showResult('Ошибка при отправке решения.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Отправить решение';
+            }
+        }
+
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.textContent = message;
+            result.classList.remove('hidden');
+        }
+
+        async function initializeApp() {
+            try {
+                const userData = await apiRequest('/api/getUser', 'POST', {});
+                if (userData.ok) {
+                    currentUser = userData.user;
+                    updateUserInfo();
+
+                    const tasksData = await apiRequest('/api/tasks');
+                    if (tasksData.ok) {
+                        allTasks = tasksData.tasks;
+                        document.getElementById('tasksSection').classList.remove('hidden');
+                        showTasksView();
+                    }
+                }
+            } catch (error) {
+                // Ошибка уже показана в apiRequest, здесь можно обработать UI
+                document.getElementById('authLoading').textContent = "Не удалось загрузить данные.";
+            }
+        }
+
+        initializeApp();
+    </script>
+</body>
+
+</html>
