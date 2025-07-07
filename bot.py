@@ -9,6 +9,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.utils.web_app import check_webapp_signature, safe_parse_webapp_init_data
+from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 
 # --- SQLAlchemy Imports ---
@@ -75,7 +76,7 @@ class Task(Base):
 
 # --- ХЭНДЛЕРЫ БОТА (ЛОГИКА) ---
 dp = Dispatcher()
-bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
 
 @dp.message(Command("start"))
