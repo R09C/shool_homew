@@ -4,4 +4,3 @@ SQLAlchemy==2.0.25
 asyncpg==0.29.0
 python-dotenv==1.0.1
 aiofiles==23.2.1
-pydantic<2.0
