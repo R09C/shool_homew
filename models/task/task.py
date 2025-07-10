@@ -3,7 +3,8 @@ from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..base_model import Base
 import logging
-import json # Добавьте импорт json
+import json
+import re # Добавляем импорт re для регулярных выражений
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -55,7 +56,20 @@ class Task(Base):
             prompt = f"""
             Сгенерируй учебное задание по программированию на тему: "{topic}"
             
-            Формат вывода (строго JSON):
+            Твой ответ ДОЛЖЕН БЫТЬ СТРОГО в формате JSON без каких-либо пояснений, вступлений или markdown-оберток.
+            Никогда не используй одинарные кавычки для ключей или строк. Всегда используй двойные кавычки.
+            Экранируй все двойные кавычки внутри строковых значений с помощью \\".
+
+            Пример правильного формата:
+            {{
+                "title": "Краткое название задания",
+                "description": "Подробное описание задания. Пример с \\"экранированием\\" кавычек.",
+                "difficulty": "Средне",
+                "points": 25,
+                "inference": "def solution():\\n    # Код решения\\n    pass"
+            }}
+
+            Вот твой запрос:
             {{
                 "title": "Краткое название задания (не более 100 символов)",
                 "description": "Подробное описание задания (не более 500 символов)",
@@ -71,12 +85,19 @@ class Task(Base):
                 provider=DeepInfraChat,
             )
             
-            # Предполагаем, что ответ может быть обернут в markdown ```json ... ```
             content = response.choices[0].message.content
-            if '```json' in content:
-                content = content.split('```json\n')[1].split('```')[0]
+            logging.info(f"Получен ответ от LLM: {content}") # Добавим логирование ответа
 
-            task_data = json.loads(content)
+            # FIX: Более надежный парсинг JSON от LLM
+            # 1. Ищем первый '{' и последний '}' для извлечения JSON объекта
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if not match:
+                raise json.JSONDecodeError("Не найден JSON объект в ответе LLM", content, 0)
+            
+            json_str = match.group(0)
+
+            # 2. Пытаемся распарсить
+            task_data = json.loads(json_str)
 
             # Создаем новое задание
             return Task.create_task(
@@ -87,7 +108,5 @@ class Task(Base):
                 inference=task_data.get("inference"),
             )
         except Exception as e:
-            # FIX: Логируем и ПРОБРАСЫВАЕМ исключение дальше
-            # чтобы вызывающий код мог его обработать.
             logging.error(f"Ошибка при генерации задания: {e}", exc_info=True)
             raise
