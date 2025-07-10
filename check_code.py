@@ -142,12 +142,12 @@ def perform_comprehensive_evaluation(
 
     llm_review_text = get_llm_code_review(submitted_code, algorithm_name)
 
-    if llm_review_text:
-        parsed_llm_review = parse_llm_review_json(llm_review_text)
-        final_report.update(parsed_llm_review)
+    parsed_llm_review = parse_llm_review_json(llm_review_text)
+    final_report.update(parsed_llm_review)
     sred_grade = sum(item.get("grade", 0) for item in final_report.values()) / len(
-        final_report
+    final_report
     )
+    print(final_report)
 
     return sred_grade, final_report["Правильность"]["grade"]
 
