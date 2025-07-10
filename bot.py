@@ -1,4 +1,5 @@
-import asyncio
+
+
 import logging
 import os
 from datetime import datetime
@@ -166,8 +167,8 @@ async def api_get_user_handler(request: web.Request) -> web.Response:
         user = result.scalar_one_or_none()
 
         if user:
-            # Безопасно вызываем to_dict без запуска дополнительных запросов
-            user_dict = await session.run_sync(lambda: user.to_dict())
+            # FIX: The lambda must accept the sync_session argument.
+            user_dict = await session.run_sync(lambda _: user.to_dict())
             return web.json_response({"ok": True, "user": user_dict})
         else:
             return web.json_response(
@@ -187,8 +188,8 @@ async def api_tasks_handler(request: web.Request) -> web.Response:
         )
         tasks_raw = result.scalars().all()
 
-        # Безопасно преобразуем результаты без инициирования ленивой загрузки
-        tasks = await session.run_sync(lambda: [task.to_dict() for task in tasks_raw])
+        # FIX: The lambda must accept the sync_session argument.
+        tasks = await session.run_sync(lambda _: [task.to_dict() for task in tasks_raw])
         return web.json_response({"ok": True, "tasks": tasks})
     except Exception as e:
         logger.error(f"Get tasks error: {e}", exc_info=True)
