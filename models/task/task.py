@@ -25,14 +25,10 @@ class Task(Base):
             "description": self.description,
             "difficulty": self.difficulty,
             "points": self.points,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            # Проверяем, что атрибут user_completions загружен, прежде чем обращаться к нему
-            "completion_count": (
-                len(self.user_completions)
-                if hasattr(self, "user_completions")
-                and self.user_completions is not None
-                else 0
-            ),
+            # Проверяем наличие атрибута created_at
+            "created_at": self.created_at.isoformat() if hasattr(self, 'created_at') and self.created_at else None,
+            # Проверяем наличие атрибута user_completions
+            "completion_count": len(self.user_completions) if hasattr(self, 'user_completions') and self.user_completions is not None else 0
         }
         return base_dict
 

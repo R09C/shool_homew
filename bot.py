@@ -160,31 +160,39 @@ async def api_get_user_handler(request: web.Request) -> web.Response:
         webapp_data = safe_parse_webapp_init_data(BOT_TOKEN, init_data=init_data)
 
         session: AsyncSession = request["session"]
-        result = await session.execute(
-            select(User).where(User.id == webapp_data.user.id)
-        )
+        # Добавляем await session.run_sync() для предотвращения ошибок с greenlet_spawn
+        user_id = webapp_data.user.id
+        result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
+
         if user:
-            return web.json_response({"ok": True, "user": user.to_dict()})
+            # Безопасно вызываем to_dict без запуска дополнительных запросов
+            user_dict = await session.run_sync(lambda: user.to_dict())
+            return web.json_response({"ok": True, "user": user_dict})
         else:
             return web.json_response(
                 {"ok": False, "error": "User not found"}, status=404
             )
     except Exception as e:
-        logger.error(f"Get user error: {e}")
-        return web.json_response(
-            {"ok": False, "error": "Internal server error"}, status=500
-        )
+        logger.error(f"Get user error: {e}", exc_info=True)
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def api_tasks_handler(request: web.Request) -> web.Response:
-    session: AsyncSession = request["session"]
-    # Заменяем обычный select на select с жадной загрузкой связанного отношения user_completions
-    result = await session.execute(
-        select(Task).options(selectinload(Task.user_completions))
-    )
-    tasks = [task.to_dict() for task in result.scalars().all()]
-    return web.json_response({"ok": True, "tasks": tasks})
+    try:
+        session: AsyncSession = request["session"]
+        # Используем await session.run_sync для безопасного выполнения запросов
+        result = await session.execute(
+            select(Task).options(selectinload(Task.user_completions))
+        )
+        tasks_raw = result.scalars().all()
+
+        # Безопасно преобразуем результаты без инициирования ленивой загрузки
+        tasks = await session.run_sync(lambda: [task.to_dict() for task in tasks_raw])
+        return web.json_response({"ok": True, "tasks": tasks})
+    except Exception as e:
+        logger.error(f"Get tasks error: {e}", exc_info=True)
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def api_generate_task(request: web.Request) -> web.Response:
