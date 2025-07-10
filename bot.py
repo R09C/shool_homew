@@ -32,7 +32,7 @@ from models.task.task import Task
 from models.user_task.user_task import UserTask
 from models.base_model import Base
 
-from .check_code import perform_comprehensive_evaluation
+from check_code import perform_comprehensive_evaluation
 
 
 logging.basicConfig(level=logging.INFO)
