@@ -1,0 +1,81 @@
+from sqlalchemy import String, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from ..base_model import Base
+import logging
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(String(500))
+    difficulty: Mapped[str] = mapped_column(String(20))
+    points: Mapped[int] = mapped_column(Integer)
+    inference: Mapped[str] = mapped_column(
+        String(5000), nullable=True
+    )  # Для внутренней проверки
+
+    # Связь с пользователями, выполнившими задание
+    user_completions = relationship("UserTask", back_populates="task")
+
+    def to_dict(self):
+        base_dict = {
+            c.name: getattr(self, c.name)
+            for c in self.__table__.columns
+            if c.name != "inference"
+        }  # Не включаем inference в ответ
+        base_dict["completion_count"] = len(self.user_completions)
+        return base_dict
+        
+    @staticmethod
+    def create_task(title, description, difficulty, points, inference=None):
+        """Метод для создания нового задания"""
+        return Task(
+            title=title,
+            description=description,
+            difficulty=difficulty,
+            points=points,
+            inference=inference,
+        )
+
+    @staticmethod
+    async def generate_task_from_topic(topic):
+        """Генерирует задание на основе темы"""
+        try:
+            from g4f.client import Client
+            from g4f.models import DeepInfraChat
+
+            client = Client()
+            prompt = f"""
+            Сгенерируй учебное задание по программированию на тему: "{topic}"
+            
+            Формат вывода (строго JSON):
+            {{
+                "title": "Краткое название задания (не более 100 символов)",
+                "description": "Подробное описание задания (не более 500 символов)",
+                "difficulty": "Один из вариантов: 'Легко', 'Средне', 'Сложно'",
+                "points": числовое значение от 10 до 50 в зависимости от сложности,
+                "inference": "Полное решение задачи на Python с комментариями"
+            }}
+            """
+
+            response = client.chat.completions.create(
+                model="deepseek-prover-v2-671b",
+                messages=[{"role": "user", "content": prompt}],
+                provider=DeepInfraChat,
+            )
+
+            import json
+
+            task_data = json.loads(response.choices[0].message.content)
+
+            # Создаем новое задание
+            return Task.create_task(
+                title=task_data.get("title"),
+                description=task_data.get("description"),
+                difficulty=task_data.get("difficulty"),
+                points=task_data.get("points"),
+                inference=task_data.get("inference"),
+            )
+        except Exception as e:
+            logging.error(f"Ошибка при генерации задания: {e}")

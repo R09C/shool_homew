@@ -1,5 +1,3 @@
-# bot.py
-
 import asyncio
 import logging
 import os
@@ -12,69 +10,45 @@ from aiogram.utils.web_app import check_webapp_signature, safe_parse_webapp_init
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 
-# --- SQLAlchemy Imports ---
-from sqlalchemy import select, update, String, BigInteger, DateTime, Integer, JSON
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from sqlalchemy import (
+    select,
+    update,
+    String,
+    BigInteger,
+    DateTime,
+    Integer,
+    JSON,
+    Table,
+    Column,
+    ForeignKey,
+    func,
+)
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-# --- НАСТРОЙКА ---
+from models.user.user import User
+from models.task.task import Task
+from models.user_task.user_task import UserTask
+from models.base_model import Base
+
+from .check_code import perform_comprehensive_evaluation
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- КОНФИГУРАЦИЯ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ---
-# Render предоставит эти переменные в вашем окружении
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-# URL, который предоставит Render (e.g., https://your-app-name.onrender.com)
 WEBAPP_URL = os.getenv("WEBAPP_URL")
-# Render предоставит внутренний URL для базы данных
 DATABASE_URL = os.getenv("DATABASE_URL")
-# Render сам подставит порт. Для локального запуска можно оставить 8080
 PORT = int(os.getenv("PORT", 8080))
 
 
-# --- НАСТРОЙКА БАЗЫ ДАННЫХ (SQLAlchemy 2.0) ---
 engine = create_async_engine(DATABASE_URL)
 async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
-# Базовый класс для наших моделей
-class Base(DeclarativeBase):
-    pass
-
-
-# Модель пользователя
-class User(Base):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    username: Mapped[str] = mapped_column(String)
-    registered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    points: Mapped[int] = mapped_column(Integer, default=0)
-    completed_tasks: Mapped[list] = mapped_column(JSON, default=list)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "username": self.username,
-            "registered_at": self.registered_at.isoformat(),
-            "points": self.points,
-            "completed_tasks": self.completed_tasks,
-        }
-
-
-# Модель задания
-class Task(Base):
-    __tablename__ = "tasks"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(100))
-    description: Mapped[str] = mapped_column(String(500))
-    difficulty: Mapped[str] = mapped_column(String(20))
-    points: Mapped[int] = mapped_column(Integer)
-
-    def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
-
-# --- ХЭНДЛЕРЫ БОТА (ЛОГИКА) ---
 dp = Dispatcher()
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
@@ -114,17 +88,43 @@ async def profile_command(message: types.Message, session: AsyncSession):
         await message.answer("Вы не зарегистрированы. Используйте /start")
         return
 
+    await session.refresh(user, ["task_completions"])
+
     profile_text = (
         f"👤 <b>Профиль</b>\n\n"
         f"Имя: {user.username}\n"
         f"Баллы: {user.points}\n"
-        f"Решено задач: {len(user.completed_tasks)}\n"
+        f"Решено задач: {len(user.task_completions)}\n"
         f"Дата регистрации: {user.registered_at.strftime('%d.%m.%Y')}"
     )
     await message.answer(profile_text)
 
 
-# --- WEB-СЕРВЕР (AIOHTTP) ---
+@dp.message(Command("newtask"))
+async def create_new_task(message: types.Message, session: AsyncSession):
+    topic = message.text.replace("/newtask", "").strip()
+    if not topic:
+        await message.answer(
+            "Укажите тему для задания, например: /newtask алгоритмы сортировки"
+        )
+        return
+
+    await message.answer("Генерирую новое задание, пожалуйста, подождите...")
+
+    try:
+        task = await Task.generate_task_from_topic(topic)
+        session.add(task)
+        await session.commit()
+
+        await message.answer(
+            f"✅ Создано новое задание!\n\n"
+            f"<b>{task.title}</b>\n"
+            f"Сложность: {task.difficulty} ({task.points} баллов)\n\n"
+            f"{task.description}"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка генерации задания: {e}", exc_info=True)
+        await message.answer("Не удалось сгенерировать задание. Попробуйте позже.")
 
 
 @web.middleware
@@ -173,6 +173,24 @@ async def api_tasks_handler(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "tasks": tasks})
 
 
+async def api_generate_task(request: web.Request) -> web.Response:
+    session: AsyncSession = request["session"]
+    try:
+        data = await request.json()
+        topic = data.get("topic", "Программирование")
+
+        task = await Task.generate_task_from_topic(topic)
+        session.add(task)
+        await session.commit()
+
+        return web.json_response({"ok": True, "task": task.to_dict()})
+    except Exception as e:
+        logger.error(f"Error generating task: {e}")
+        return web.json_response(
+            {"ok": False, "error": "Не удалось сгенерировать задание"}, status=500
+        )
+
+
 async def api_submit_handler(request: web.Request) -> web.Response:
     session: AsyncSession = request["session"]
     try:
@@ -189,17 +207,34 @@ async def api_submit_handler(request: web.Request) -> web.Response:
         task_id = int(data.get("taskId"))
 
         user = await session.get(User, user_id)
-        if task_id in user.completed_tasks:
+        task = await session.get(Task, task_id)
+
+        existing_completion = await session.execute(
+            select(UserTask).where(
+                UserTask.user_id == user_id, UserTask.task_id == task_id
+            )
+        )
+        completion = existing_completion.scalar_one_or_none()
+
+        if completion:
             return web.json_response(
                 {"ok": True, "passed": False, "message": "Вы уже решили эту задачу!"}
             )
 
-        is_correct = True  # Заглушка для проверки кода
+        points, is_correct = perform_comprehensive_evaluation(
+            template_code=task.inference,
+            submitted_code=data.get("code"),
+            algorithm_name=task.title,
+        )
 
-        if is_correct:
-            task = await session.get(Task, task_id)
-            user.points += task.points
-            user.completed_tasks = user.completed_tasks + [task_id]
+        if is_correct > 3:
+
+            new_completion = UserTask(
+                user_id=user_id, task_id=task_id, earned_points=points
+            )
+            session.add(new_completion)
+            user.points += points
+
             await session.commit()
 
             return web.json_response(
@@ -208,7 +243,7 @@ async def api_submit_handler(request: web.Request) -> web.Response:
                     "passed": True,
                     "message": f"Отлично! Задача решена. Вам начислено {task.points} баллов.",
                     "new_points": user.points,
-                    "new_completed_count": len(user.completed_tasks),
+                    "new_completed_count": len(user.task_completions),
                 }
             )
         else:
@@ -237,19 +272,19 @@ async def on_startup(app: web.Application):
                         title="Основы Python",
                         description="Напишите функцию для сортировки массива",
                         difficulty="Легко",
-                        points=10,
+                        points=5,
                     ),
                     Task(
                         title="Алгоритмы",
                         description="Реализуйте алгоритм поиска в глубину",
                         difficulty="Средне",
-                        points=20,
+                        points=5,
                     ),
                     Task(
                         title="Структуры данных",
                         description="Создайте класс для работы с бинарным деревом",
                         difficulty="Сложно",
-                        points=30,
+                        points=5,
                     ),
                 ]
                 session.add_all(initial_tasks)
@@ -285,6 +320,7 @@ def main():
     app.router.add_post("/api/getUser", api_get_user_handler)
     app.router.add_get("/api/tasks", api_tasks_handler)
     app.router.add_post("/api/submit", api_submit_handler)
+    app.router.add_post("/api/generate-task", api_generate_task)
 
     web.run_app(app, host="0.0.0.0", port=PORT)
 
