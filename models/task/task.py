@@ -1,8 +1,9 @@
+
 from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..base_model import Base
 import logging
-
+import json # Добавьте импорт json
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -69,10 +70,13 @@ class Task(Base):
                 messages=[{"role": "user", "content": prompt}],
                 provider=DeepInfraChat,
             )
+            
+            # Предполагаем, что ответ может быть обернут в markdown ```json ... ```
+            content = response.choices[0].message.content
+            if '```json' in content:
+                content = content.split('```json\n')[1].split('```')[0]
 
-            import json
-
-            task_data = json.loads(response.choices[0].message.content)
+            task_data = json.loads(content)
 
             # Создаем новое задание
             return Task.create_task(
@@ -83,4 +87,7 @@ class Task(Base):
                 inference=task_data.get("inference"),
             )
         except Exception as e:
-            logging.error(f"Ошибка при генерации задания: {e}")
+            # FIX: Логируем и ПРОБРАСЫВАЕМ исключение дальше
+            # чтобы вызывающий код мог его обработать.
+            logging.error(f"Ошибка при генерации задания: {e}", exc_info=True)
+            raise
