@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..base_model import Base
 import logging
 import json
-import re # Добавляем импорт re для регулярных выражений
+import re 
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -15,9 +15,9 @@ class Task(Base):
     points: Mapped[int] = mapped_column(Integer)
     inference: Mapped[str] = mapped_column(
         String(5000), nullable=True
-    )  # Для внутренней проверки
+    )  
 
-    # Связь с пользователями, выполнившими задание
+    
     user_completions = relationship("UserTask", back_populates="task")
 
     def to_dict(self):
@@ -27,9 +27,9 @@ class Task(Base):
             "description": self.description,
             "difficulty": self.difficulty,
             "points": self.points,
-            # Проверяем наличие атрибута created_at
+            
             "created_at": self.created_at.isoformat() if hasattr(self, 'created_at') and self.created_at else None,
-            # Проверяем наличие атрибута user_completions
+            
             "completion_count": len(self.user_completions) if hasattr(self, 'user_completions') and self.user_completions is not None else 0
         }
         return base_dict
@@ -65,8 +65,8 @@ class Task(Base):
                 "title": "Краткое название задания",
                 "description": "Подробное описание задания. Пример с \\"экранированием\\" кавычек.",
                 "difficulty": "Средне",
-                "points": 25,
-                "inference": "def solution():\\n    # Код решения\\n    pass"
+                "points": 5, # Количество баллов за выполнение задания всегда 5
+                "inference": "def solution():\\n    
             }}
 
             Вот твой запрос:
@@ -74,7 +74,7 @@ class Task(Base):
                 "title": "Краткое название задания (не более 100 символов)",
                 "description": "Подробное описание задания (не более 500 символов)",
                 "difficulty": "Один из вариантов: 'Легко', 'Средне', 'Сложно'",
-                "points": числовое значение от 10 до 50 в зависимости от сложности,
+                "points": 5,  
                 "inference": "Полное решение задачи на Python с комментариями"
             }}
             """
@@ -86,20 +86,20 @@ class Task(Base):
             )
             
             content = response.choices[0].message.content
-            logging.info(f"Получен ответ от LLM: {content}") # Добавим логирование ответа
+            logging.info(f"Получен ответ от LLM: {content}") 
 
-            # FIX: Более надежный парсинг JSON от LLM
-            # 1. Ищем первый '{' и последний '}' для извлечения JSON объекта
+            
+            
             match = re.search(r'\{.*\}', content, re.DOTALL)
             if not match:
                 raise json.JSONDecodeError("Не найден JSON объект в ответе LLM", content, 0)
             
             json_str = match.group(0)
 
-            # 2. Пытаемся распарсить
+            
             task_data = json.loads(json_str)
 
-            # Создаем новое задание
+            
             return Task.create_task(
                 title=task_data.get("title"),
                 description=task_data.get("description"),

@@ -1,5 +1,3 @@
-
-
 import logging
 import os
 from datetime import datetime
@@ -161,13 +159,13 @@ async def api_get_user_handler(request: web.Request) -> web.Response:
         webapp_data = safe_parse_webapp_init_data(BOT_TOKEN, init_data=init_data)
 
         session: AsyncSession = request["session"]
-        # Добавляем await session.run_sync() для предотвращения ошибок с greenlet_spawn
+
         user_id = webapp_data.user.id
         result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if user:
-            # FIX: The lambda must accept the sync_session argument.
+
             user_dict = await session.run_sync(lambda _: user.to_dict())
             return web.json_response({"ok": True, "user": user_dict})
         else:
@@ -182,13 +180,12 @@ async def api_get_user_handler(request: web.Request) -> web.Response:
 async def api_tasks_handler(request: web.Request) -> web.Response:
     try:
         session: AsyncSession = request["session"]
-        # Используем await session.run_sync для безопасного выполнения запросов
+
         result = await session.execute(
             select(Task).options(selectinload(Task.user_completions))
         )
         tasks_raw = result.scalars().all()
 
-        # FIX: The lambda must accept the sync_session argument.
         tasks = await session.run_sync(lambda _: [task.to_dict() for task in tasks_raw])
         return web.json_response({"ok": True, "tasks": tasks})
     except Exception as e:

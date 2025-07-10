@@ -11,10 +11,8 @@ class User(Base):
     registered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     points: Mapped[int] = mapped_column(Integer, default=0)
 
-    # Связь с выполненными заданиями через промежуточную таблицу
     task_completions = relationship("UserTask", back_populates="user")
 
-    # Удобное свойство для получения списка заданий
     @property
     def completed_tasks(self):
         return [completion.task for completion in self.task_completions]
