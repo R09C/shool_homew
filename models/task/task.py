@@ -20,13 +20,22 @@ class Task(Base):
 
     def to_dict(self):
         base_dict = {
-            c.name: getattr(self, c.name)
-            for c in self.__table__.columns
-            if c.name != "inference"
-        }  # Не включаем inference в ответ
-        base_dict["completion_count"] = len(self.user_completions)
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "difficulty": self.difficulty,
+            "points": self.points,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            # Проверяем, что атрибут user_completions загружен, прежде чем обращаться к нему
+            "completion_count": (
+                len(self.user_completions)
+                if hasattr(self, "user_completions")
+                and self.user_completions is not None
+                else 0
+            ),
+        }
         return base_dict
-        
+
     @staticmethod
     def create_task(title, description, difficulty, points, inference=None):
         """Метод для создания нового задания"""

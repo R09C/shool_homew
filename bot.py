@@ -179,7 +179,10 @@ async def api_get_user_handler(request: web.Request) -> web.Response:
 
 async def api_tasks_handler(request: web.Request) -> web.Response:
     session: AsyncSession = request["session"]
-    result = await session.execute(select(Task))
+    # Заменяем обычный select на select с жадной загрузкой связанного отношения user_completions
+    result = await session.execute(
+        select(Task).options(selectinload(Task.user_completions))
+    )
     tasks = [task.to_dict() for task in result.scalars().all()]
     return web.json_response({"ok": True, "tasks": tasks})
 
